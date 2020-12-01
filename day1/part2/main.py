@@ -1,5 +1,5 @@
 from functools import wraps
-from itertools import product, tee
+from itertools import combinations
 from math import prod
 
 import click
@@ -14,7 +14,7 @@ def sum_to_2020(int_tuple):
 @click.option("--factors", required=True, type=click.INT, default=3)
 def main(input, factors):
     integers = map(int, input.readlines())
-    integer_tuples = product(*tee(integers, factors))
+    integer_tuples = combinations(integers, factors)
     integer_tuples = filter(sum_to_2020, integer_tuples)
     results = map(prod, integer_tuples)
     print(list(results))
