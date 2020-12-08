@@ -2,7 +2,18 @@ from functools import partial
 
 import click
 
-test_program = ["nop +0", "acc +1", "jmp +4", "acc +3", "jmp -3", "acc -99", "acc +1", "jmp -4", "acc +6"]
+test_program_part1 = ["nop +0", "acc +1", "jmp +4", "acc +3", "jmp -3", "acc -99", "acc +1", "jmp -4", "acc +6"]
+test_program_part2 = ["nop +0", "acc +1", "jmp +4", "acc +3", "jmp -3", "acc -99", "acc +1", "nop -4", "acc +6"]
+
+
+class InstructionHalt(Exception):
+    def __init__(self, state):
+        self.state = state
+
+
+class InfiniteLoopHalt(Exception):
+    def __init__(self, state):
+        self.state = state
 
 
 def parse_instruction(line):
@@ -35,20 +46,34 @@ def execute_program(instructions):
         'jmp': handle_jmp,
     }
 
-    while True:
-        if visited_instructions[state['program_counter']] == 1:
-            return state['accumulator']
-        visited_instructions[state['program_counter']] = 1
+    try:
+        while True:
+            if visited_instructions[state['program_counter']] == 1:
+                raise InfiniteLoopHalt(state)
+            visited_instructions[state['program_counter']] = 1
 
-        instruction, argument = instructions[state['program_counter']]
-        print(state, instruction, argument)
-        state = opcode_map[instruction](state, argument)
-        state['program_counter'] += 1
+            instruction, argument = instructions[state['program_counter']]
+            # print(state, instruction, argument)
+            state = opcode_map[instruction](state, argument)
+            state['program_counter'] += 1
+    except IndexError:
+        raise InstructionHalt(state)
 
 
 assert parse_instruction("nop +0") == ("nop", 0)
 assert parse_instruction("jmp +4") == ("jmp", 4)
 assert parse_instruction("acc -11") == ("acc", -11)
+
+
+def generate_mutated_instructions(instructions):
+    for x in range(len(instructions)):
+        new_instructions = instructions.copy()
+        instruction = new_instructions[x]
+        if instruction[0] == "jmp":
+            new_instructions[x] = ("nop", instruction[1])
+        if instruction[0] == "nop":
+            new_instructions[x] = ("jmp", instruction[1])
+        yield new_instructions
 
 
 @click.command()
@@ -57,13 +82,23 @@ assert parse_instruction("acc -11") == ("acc", -11)
 def main(input, part):
     # Iterator of lines
     lines = map(lambda x: x.strip(), input.readlines())
-    #lines = test_program
+    # lines = test_program_part1
+    # lines = test_program_part2
     # Iterator of rules
     instructions = map(parse_instruction, lines)
     instructions = list(instructions)
     # Run program
-    print(instructions)
-    print(execute_program(instructions))
+    # print(instructions)
+    if part == "1":
+        execute_program(instructions)
+    elif part == "2":
+        # Loop through all mutated programs
+        for new_instructions in generate_mutated_instructions(instructions):
+            # Keep running, until we find one that terminates with InstructionHalt
+            try:
+                execute_program(new_instructions)
+            except InfiniteLoopHalt:
+                continue
 
 
 if __name__ == "__main__":
