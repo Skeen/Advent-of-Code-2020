@@ -2,8 +2,28 @@ from functools import partial
 
 import click
 
-test_program_part1 = ["nop +0", "acc +1", "jmp +4", "acc +3", "jmp -3", "acc -99", "acc +1", "jmp -4", "acc +6"]
-test_program_part2 = ["nop +0", "acc +1", "jmp +4", "acc +3", "jmp -3", "acc -99", "acc +1", "nop -4", "acc +6"]
+test_program_part1 = [
+    "nop +0",
+    "acc +1",
+    "jmp +4",
+    "acc +3",
+    "jmp -3",
+    "acc -99",
+    "acc +1",
+    "jmp -4",
+    "acc +6",
+]
+test_program_part2 = [
+    "nop +0",
+    "acc +1",
+    "jmp +4",
+    "acc +3",
+    "jmp -3",
+    "acc -99",
+    "acc +1",
+    "nop -4",
+    "acc +6",
+]
 
 
 class InstructionHalt(Exception):
@@ -24,38 +44,35 @@ def parse_instruction(line):
 
 def execute_program(instructions):
     visited_instructions = [0] * len(instructions)
-    state = {
-        'accumulator': 0,
-        'program_counter': 0
-    }
+    state = {"accumulator": 0, "program_counter": 0}
 
     def handle_nop(state, argument):
         return state
 
     def handle_acc(state, argument):
-        state['accumulator'] += argument
+        state["accumulator"] += argument
         return state
 
     def handle_jmp(state, argument):
-        state['program_counter'] += argument - 1
+        state["program_counter"] += argument - 1
         return state
 
     opcode_map = {
-        'nop': handle_nop,
-        'acc': handle_acc,
-        'jmp': handle_jmp,
+        "nop": handle_nop,
+        "acc": handle_acc,
+        "jmp": handle_jmp,
     }
 
     try:
         while True:
-            if visited_instructions[state['program_counter']] == 1:
+            if visited_instructions[state["program_counter"]] == 1:
                 raise InfiniteLoopHalt(state)
-            visited_instructions[state['program_counter']] = 1
+            visited_instructions[state["program_counter"]] = 1
 
-            instruction, argument = instructions[state['program_counter']]
+            instruction, argument = instructions[state["program_counter"]]
             # print(state, instruction, argument)
             state = opcode_map[instruction](state, argument)
-            state['program_counter'] += 1
+            state["program_counter"] += 1
     except IndexError:
         raise InstructionHalt(state)
 
