@@ -1,29 +1,55 @@
-from functools import partial
-
 import click
 
-test_program_part1 = [
-    "nop +0",
-    "acc +1",
-    "jmp +4",
-    "acc +3",
-    "jmp -3",
-    "acc -99",
-    "acc +1",
-    "jmp -4",
-    "acc +6",
-]
-test_program_part2 = [
-    "nop +0",
-    "acc +1",
-    "jmp +4",
-    "acc +3",
-    "jmp -3",
-    "acc -99",
-    "acc +1",
-    "nop -4",
-    "acc +6",
-]
+
+def parse_instruction(line):
+    # Strip the input line to be simpler
+    instruction, argument = line.split(" ")
+    return instruction, int(argument)
+
+
+assert parse_instruction("nop +0") == ("nop", 0)
+assert parse_instruction("jmp +4") == ("jmp", 4)
+assert parse_instruction("acc -11") == ("acc", -11)
+
+
+def lines_to_instructions(lines):
+    instructions = map(parse_instruction, lines)
+    instructions = list(instructions)
+    return instructions
+
+
+test_program_part1 = lines_to_instructions(
+    [
+        "nop +0",
+        "acc +1",
+        "jmp +4",
+        "acc +3",
+        "jmp -3",
+        "acc -99",
+        "acc +1",
+        "jmp -4",
+        "acc +6",
+    ]
+)
+
+
+def transform_instruction(instruction):
+    opcode_map = {
+        "acc": "acc",
+        "jmp": "nop",
+        "nop": "jmp",
+    }
+    instruction, argument = instruction
+    return opcode_map[instruction], argument
+
+
+assert transform_instruction(("nop", 0)) == ("jmp", 0)
+assert transform_instruction(("jmp", 4)) == ("nop", 4)
+assert transform_instruction(("acc", -11)) == ("acc", -11)
+
+
+test_program_part2 = test_program_part1.copy()
+test_program_part2[-2] = transform_instruction(test_program_part2[-2])
 
 
 class InstructionHalt(Exception):
@@ -36,14 +62,7 @@ class InfiniteLoopHalt(Exception):
         self.state = state
 
 
-def parse_instruction(line):
-    # Strip the input line to be simpler
-    instruction, argument = line.split(" ")
-    return instruction, int(argument)
-
-
 def execute_program(instructions):
-    visited_instructions = [0] * len(instructions)
     state = {"accumulator": 0, "program_counter": 0}
 
     def handle_nop(state, argument):
@@ -57,40 +76,33 @@ def execute_program(instructions):
         state["program_counter"] += argument - 1
         return state
 
+    def handle_hlt(state, argument):
+        raise InfiniteLoopHalt(state)
+
     opcode_map = {
         "nop": handle_nop,
         "acc": handle_acc,
         "jmp": handle_jmp,
+        "hlt": handle_hlt,
     }
 
     try:
         while True:
-            if visited_instructions[state["program_counter"]] == 1:
-                raise InfiniteLoopHalt(state)
-            visited_instructions[state["program_counter"]] = 1
-
             instruction, argument = instructions[state["program_counter"]]
+            # Set run instructions to infinite loop halt instructions
+            instructions[state["program_counter"]] = ("hlt", 0)
             # print(state, instruction, argument)
+            # Execute instruction
             state = opcode_map[instruction](state, argument)
             state["program_counter"] += 1
     except IndexError:
         raise InstructionHalt(state)
 
 
-assert parse_instruction("nop +0") == ("nop", 0)
-assert parse_instruction("jmp +4") == ("jmp", 4)
-assert parse_instruction("acc -11") == ("acc", -11)
-
-
 def generate_mutated_instructions(instructions):
     for x in range(len(instructions)):
-        new_instructions = instructions.copy()
-        instruction = new_instructions[x]
-        if instruction[0] == "jmp":
-            new_instructions[x] = ("nop", instruction[1])
-        if instruction[0] == "nop":
-            new_instructions[x] = ("jmp", instruction[1])
-        yield new_instructions
+        new_instruction = transform_instruction(instructions[x])
+        yield instructions[:x] + [new_instruction] + instructions[x + 1 :]
 
 
 @click.command()
@@ -99,13 +111,8 @@ def generate_mutated_instructions(instructions):
 def main(input, part):
     # Iterator of lines
     lines = map(lambda x: x.strip(), input.readlines())
-    # lines = test_program_part1
-    # lines = test_program_part2
-    # Iterator of rules
-    instructions = map(parse_instruction, lines)
-    instructions = list(instructions)
+    instructions = lines_to_instructions(lines)
     # Run program
-    # print(instructions)
     if part == "1":
         execute_program(instructions)
     elif part == "2":
