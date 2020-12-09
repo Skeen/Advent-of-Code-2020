@@ -1,5 +1,7 @@
+from functools import partial
 from itertools import combinations, count, filterfalse
 from operator import itemgetter
+from sys import exit
 
 import click
 from more_itertools import windowed
@@ -12,6 +14,11 @@ def check_validity(window):
     integer_tuples = combinations(preamble, 2)
     integer_tuples = filter(lambda int_tuple: sum(int_tuple) == check, integer_tuples)
     return next(integer_tuples, None) != None
+
+
+def check_decorated_sum(lookup_value, decorated_sum):
+    summation, window = decorated_sum
+    return summation == lookup_value
 
 
 @click.command()
@@ -36,14 +43,15 @@ def main(input, part):
         windows = list(windowed(integers, num_factors))
         sums = map(sum, windows)
         decorated_sums = zip(sums, windows)
-        for summation, window in decorated_sums:
-            if summation == first_invalid:
-                minimum, maximum = min(window), max(window)
-                print(minimum, maximum)
-                print(minimum + maximum)
-                from sys import exit
-
-                exit(1)
+        decorated_sums = filter(
+            partial(check_decorated_sum, first_invalid), decorated_sums
+        )
+        passed_windows = map(itemgetter(1), decorated_sums)
+        solution = next(passed_windows, None)
+        if solution:
+            minimum, maximum = min(solution), max(solution)
+            print(minimum + maximum)
+            exit(1)
 
 
 if __name__ == "__main__":
