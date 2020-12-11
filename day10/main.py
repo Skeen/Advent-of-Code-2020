@@ -1,26 +1,34 @@
+from math import prod
 from collections import Counter
-
-from functools import lru_cache
+from functools import wraps
 from itertools import chain
 
 import click
-from more_itertools import pairwise, unzip
+from more_itertools import pairwise, unzip, split_after
 
 
-@lru_cache(maxsize=0)
-def find_arrangements(start, integers):
-    valid_adapters = list(filter(lambda x: x <= start+3, integers))
-    if valid_adapters == []:
+def apply(func):
+    @wraps(func)
+    def applied(tup):
+        return func(*tup)
+
+    return applied
+
+
+def find_arrangements(integers):
+    if integers == []:
         return 1
 
-    count = 0
-    for valid_adapter in valid_adapters:
-        new_start = (start + (valid_adapter - start))
-        count += find_arrangements(
-            new_start,
-            [x for x in integers if x>new_start],
-        )
-    return count
+    start = integers[0] - 1
+    valid_adapters = filter(lambda x: x <= start+3, integers)
+
+    def produce_lists(adapter):
+        new_start = start + (adapter - start)
+        return list(filter(lambda x: x > new_start, integers))
+
+    integer_lists = map(produce_lists, valid_adapters)
+
+    return sum(map(find_arrangements, integer_lists))
 
 
 @click.command()
@@ -37,26 +45,35 @@ def main(input, part):
 
     min_jolts = 0
     max_jolts = integers[-1] + 3
-    print(min_jolts, max_jolts)
-    print(len(integers))
-    print(integers)
+    diff_integers = chain([min_jolts], integers, [max_jolts])
+    differences = list(map(lambda a,b: b-a, *unzip(pairwise(diff_integers))))
 
     if part == "1":
-        integers = chain([min_jolts], integers, [max_jolts])
-        differences = list(map(lambda a,b: b-a, *unzip(pairwise(integers))))
         differences = Counter(differences)
-        print(differences)
         print(differences[1] * differences[3])
     if part == "2":
-        splits = list(map(lambda a,b: b-a == 3, *unzip(pairwise(integers))))
-        splits = [min_jolts] + [x for i,x in enumerate(integers) if splits[i-1]] + [max_jolts]
-        sub_counts = map(
-            lambda start, end: find_arrangements(start, [x for x in integers if x>start and x<=end]),
-            *unzip(pairwise(splits))
-        )
-        from math import prod
+        # We do not have to consider all possible combinations, as all the
+        # combinations will contain certain sequences, namely all sequences
+        # will passthrough 3-difference numbers, and thus the sequences on
+        # either side of these 3-difference numbers are independent.
+        #
+        # Thus we can split the problem into several subproblems, one on either
+        # side of the 3-difference numbers.
+        @apply
+        def difference_is_3(index, value):
+            """Check if the current index is a 3-difference number."""
+            return differences[index] == 3
+
+        # Iterator of subproblems (lists seperated by 3-difference numbers)
+        # Each element in the lists are (index, value)
+        subproblems = split_after(enumerate(integers), difference_is_3)
+        # Map each element in the lists to just value (drop index)
+        subproblems = map(lambda element: list(unzip(element)[1]), subproblems)
+        # Find number of possible combinations for each block
+        sub_counts = map(find_arrangements, subproblems)
+        # Multiple the values for all the blocks to get a total
         print(prod(sub_counts))
-    
+
 
 if __name__ == "__main__":
     main()
